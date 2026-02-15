@@ -1,17 +1,19 @@
 {
-  "name": "agentmesh",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.28.2",
-  "devDependencies": {
-    "@types/node": "^25.2.3",
-    "typescript": "^5.9.3"
-  }
+    "name": "agentmesh",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "packageManager": "pnpm@10.28.2",
+    "devDependencies": {
+        "@types/node": "^25.2.3",
+        "prettier": "^3.8.1",
+        "typescript": "^5.9.3"
+    },
+    "type": "module"
 }
