@@ -1,0 +1,26 @@
+{
+    "$schema": "https://www.schemastore.org/tsconfig",
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "target": "esnext",
+        "allowJs": true,
+        "resolveJsonModule": true,
+        "moduleDetection": "force",
+        "verbatimModuleSyntax": true,
+        "paths": {
+            "@agentmesh/*": [
+                "./packages/*"
+            ]
+        },
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "module": "nodenext",
+        "outDir": "dist",
+        "jsx": "preserve",
+    }
+}
