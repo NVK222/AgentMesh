@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider        = "postgresql"
+  extensions      = [pgcrypto]
+}
+
+model Mission {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goal          String
+  status        String    @default("PENDING")
+  totalTokens   Int       @default(0)
+  cost          Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tasks         Task[]
+}
+
+model Task {
+
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mission       Mission   @relation(fields:[missionId], references:[id])
+  missionId     String    @db.Uuid
+  type          String
+  status        String    @default("Waiting")
+  inputContext  Json
+  outputResult  Json?
+  dependencies  Task[]    @relation("TaskGraph")
+  dependedOnBy  Task[]    @relation("TaskGraph")
+  logs          AgentLog[]
+}
+
+model AgentLog {
+
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task       Task       @relation(fields:[taskid], references:[id])
+  taskid     String     @db.Uuid
+  agentRole  String
+  content    String
+  createdAt  DateTime   @default(now())
+}
