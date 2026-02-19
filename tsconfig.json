@@ -10,10 +10,13 @@
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
     "paths": {
-      "@agentmesh/*": [
-        "./packages/*",
-        "./apps/*"
-      ]
+      "@agentmesh/shared": [
+        "./packages/shared/src/index.ts"
+      ],
+      //"@agentmesh/*": [
+      //  "./packages/*",
+      //  "./apps/*"
+      //]
     },
     "strict": true,
     "noUncheckedIndexedAccess": true,
