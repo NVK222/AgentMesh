@@ -1,5 +1,6 @@
-import { db, MissionStatus } from "@agentmesh/shared";
+import { CreateMissionSchema, db } from "@agentmesh/shared";
 import type { Request, Response } from "express";
+import * as z from "zod";
 
 export async function getMissions(req: Request, res: Response) {
   const missions = await db.mission.findMany();
@@ -8,13 +9,17 @@ export async function getMissions(req: Request, res: Response) {
 
 export async function createMission(req: Request, res: Response) {
   try {
-    const { goal } = req.body;
+    const zresult = CreateMissionSchema.safeParse(req.body);
 
-    if (!goal) {
-      return res.status(400).json({
-        error: "No goal",
-      });
+    if (!zresult.success) {
+      console.error(z.prettifyError(zresult.error));
+      return res
+        .status(400)
+        .json({ error: "Goal must be atleast 1 characters long!" });
     }
+
+    const { goal } = zresult.data;
+
     const result = await db.mission.create({
       data: {
         goal,
