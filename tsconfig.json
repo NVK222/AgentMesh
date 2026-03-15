@@ -23,7 +23,6 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "module": "esnext",
     "outDir": "dist",
     "jsx": "preserve",
