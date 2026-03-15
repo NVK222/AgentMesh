@@ -15,28 +15,51 @@ datasource db {
   extensions      = [pgcrypto]
 }
 
+enum MissionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  PAUSED
+}
+
+enum TaskStatus {
+  WAITING
+  COMPLETED
+  READY
+  ACTIVE
+  REJECTED
+}
+
+enum TaskType {
+  RESEARCH
+  CODE
+  REVIEW
+  DEPLOY
+}
+
 model Mission {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   goal          String
-  status        String    @default("PENDING")
-  totalTokens   Int       @default(0)
-  cost          Float     @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  status        MissionStatus     @default(PENDING)
+  totalTokens   Int               @default(0)
+  cost          Float             @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   tasks         Task[]
 }
 
 model Task {
 
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mission       Mission   @relation(fields:[missionId], references:[id])
-  missionId     String    @db.Uuid
-  type          String
-  status        String    @default("Waiting")
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mission       Mission           @relation(fields:[missionId], references:[id])
+  missionId     String            @db.Uuid
+  type          TaskType
+  status        TaskStatus        @default(WAITING)
   inputContext  Json
   outputResult  Json?
-  dependencies  Task[]    @relation("TaskGraph")
-  dependedOnBy  Task[]    @relation("TaskGraph")
+  dependencies  Task[]            @relation("TaskGraph")
+  dependedOnBy  Task[]            @relation("TaskGraph")
   logs          AgentLog[]
 }
 
