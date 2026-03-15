@@ -10,7 +10,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx --env-file=../../.env ./src/index.ts"
+    "dev": "tsx --env-file=../../.env ./src/index.ts",
+    "dev:w": "tsx watch --env-file=../../.env ./src/index.ts"
   },
   "keywords": [],
   "author": "",

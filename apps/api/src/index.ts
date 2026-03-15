@@ -1,17 +1,10 @@
-import { db, MissionStatus } from "@agentmesh/shared";
+import express from "express";
+import missionRouter from "./routes/mission.routes";
 
-const testInsert = async () => {
-  try {
-    const mission = await db.mission.create({
-      data: {
-        goal: "Fix this typo.",
-        status: MissionStatus.PENDING,
-      },
-    });
-    console.log(mission);
-  } catch (e) {
-    console.error("Database write failed :  ", e);
-  }
-};
+const app = express();
+app.use(express.json());
+app.use("/missions", missionRouter);
 
-testInsert();
+app.listen(8080, () => {
+  console.log("Connected to server");
+});
