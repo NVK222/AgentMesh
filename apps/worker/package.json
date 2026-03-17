@@ -1,0 +1,29 @@
+{
+  "name": "@agentmesh/worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --env-file=../../.env ./src/index.ts",
+    "dev:w": "tsx watch --env-file=../../.env ./src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.2",
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@agentmesh/shared": "workspace:*"
+  },
+  "type": "module"
+}
