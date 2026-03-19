@@ -23,7 +23,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@agentmesh/shared": "workspace:*"
+    "@agentmesh/shared": "workspace:*",
+    "@google/genai": "^1.46.0",
+    "dotenv": "^17.3.1"
   },
   "type": "module"
 }

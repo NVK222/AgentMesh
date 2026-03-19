@@ -1,4 +1,8 @@
 import { db, MissionStatus } from "@agentmesh/shared";
+import { Agent } from "./services/agent.service";
+import "dotenv/config";
+
+const agent = new Agent(process.env.GEMINI_API_KEY ?? "");
 
 const poll = async () => {
   try {
@@ -24,6 +28,9 @@ const poll = async () => {
           status: MissionStatus.RUNNING,
         },
       });
+
+      const response = await agent.execMission(mission.goal);
+      console.log(response);
     }
   } catch (e: unknown) {
     if (e instanceof Error) {
