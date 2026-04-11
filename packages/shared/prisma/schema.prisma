@@ -56,6 +56,9 @@ model Task {
   missionId     String            @db.Uuid
   type          TaskType
   status        TaskStatus        @default(WAITING)
+  title         String
+  description   String
+  order         Int
   inputContext  Json
   outputResult  Json?
   dependencies  Task[]            @relation("TaskGraph")
