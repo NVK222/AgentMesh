@@ -29,6 +29,7 @@ enum TaskStatus {
   READY
   ACTIVE
   REJECTED
+  FAILED
 }
 
 enum TaskType {
