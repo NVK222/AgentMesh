@@ -2,8 +2,20 @@ import { db, MissionStatus, TaskStatus, TaskType } from "@agentmesh/shared";
 import { Agent } from "./services/agent.service";
 import "dotenv/config";
 import type { Task } from "packages/shared/src/generated/client/client";
+import type { InputJsonValue } from "packages/shared/src/generated/client/internal/prismaNamespace";
 
 const agent = new Agent(process.env.GEMINI_API_KEY ?? "");
+const NUM_TASKS_IN_HISTORY = 5;
+
+interface CreateTask {
+  missionId: string;
+  type: TaskType;
+  status: TaskStatus;
+  title: string;
+  description: string;
+  order: number;
+  inputContext: InputJsonValue;
+}
 
 const poll = async () => {
   try {
@@ -21,6 +33,7 @@ const poll = async () => {
 };
 
 const tryTask = async () => {
+  // Get a task from a running mission to try to complete
   const task = await db.task.findFirst({
     where: {
       status: TaskStatus.WAITING,
@@ -36,6 +49,7 @@ const tryTask = async () => {
       mission: true,
     },
   });
+  // If we find one act on it
   if (task) {
     await db.task.update({
       where: {
@@ -49,41 +63,104 @@ const tryTask = async () => {
       `Found task: [${task.id}] - Goal : ${task.description} - Starting execution ...`
     );
 
-    //TODO: Implement dumb agent
-    console.log("Task completed.");
+    // Get a history of all the previously completed tasks for the same mission for the agent
 
-    await db.task.update({
-      where: {
-        id: task.id,
-      },
-
-      data: {
-        status: TaskStatus.COMPLETED,
-      },
-    });
-
-    const count = await db.task.count({
+    const history = await db.task.findMany({
       where: {
         missionId: task.missionId,
-        status: {
-          not: TaskStatus.COMPLETED,
-        },
+        status: TaskStatus.COMPLETED,
+      },
+      orderBy: {
+        order: "asc",
       },
     });
 
-    if (count === 0) {
+    const reducedHistory = history.slice(
+      history.length - 1 - NUM_TASKS_IN_HISTORY
+    );
+
+    let historyString = `
+  #Previous Work Done:\n
+`;
+    reducedHistory.map((currTask) => {
+      historyString += `###Task: ${currTask.title} | ###Result: ${currTask.outputResult?.toString()}\n`;
+    });
+
+    try {
+      const response = await agent.execTask(
+        task.description,
+        historyString,
+        task.mission.goal
+      );
+
+      if (!response || response.includes('"error":')) {
+        throw new Error(response || "Empty response from agent");
+      }
+
+      console.log(response);
+
+      console.log("Task completed.");
+
+      await db.task.update({
+        where: {
+          id: task.id,
+        },
+
+        data: {
+          status: TaskStatus.COMPLETED,
+          outputResult: response,
+        },
+      });
+
+      const count = await db.task.count({
+        where: {
+          missionId: task.missionId,
+          status: {
+            not: TaskStatus.COMPLETED,
+          },
+        },
+      });
+
+      if (count === 0) {
+        await db.mission.update({
+          where: {
+            id: task.missionId,
+          },
+          data: {
+            status: MissionStatus.COMPLETED,
+          },
+        });
+      }
+
+      return task;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(
+        `Task ${task.id} failed. Failing Mission ${task.missionId}.`
+      );
+      console.error(msg);
+      await db.task.update({
+        where: {
+          id: task.id,
+        },
+        data: {
+          status: TaskStatus.FAILED,
+        },
+      });
+
       await db.mission.update({
         where: {
           id: task.missionId,
         },
         data: {
-          status: MissionStatus.COMPLETED,
+          status: MissionStatus.FAILED,
         },
       });
-    }
 
-    return task;
+      throw e;
+    }
   }
+
   return null;
 };
 
@@ -139,7 +216,7 @@ const tryMission = async () => {
 
     try {
       const parsed_res: Array<Task> = JSON.parse(clean_response[0]);
-      let newTasks = [];
+      let newTasks: Array<CreateTask> = [];
 
       parsed_res.map((currTask) => {
         newTasks.push({
@@ -147,7 +224,7 @@ const tryMission = async () => {
           description: currTask.description,
           order: currTask.order,
           missionId: mission.id,
-          type: TaskType.CODE,
+          type: currTask.type,
           status: TaskStatus.WAITING,
           inputContext: currTask.inputContext ?? {},
         });
