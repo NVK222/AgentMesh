@@ -10,5 +10,5 @@ app.use("/missions", missionRouter);
 app.use(errorHandler);
 
 app.listen(8080, () => {
-  console.log("Connected to server");
+    console.log("Connected to server");
 });

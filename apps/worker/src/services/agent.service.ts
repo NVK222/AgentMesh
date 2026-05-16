@@ -1,23 +1,23 @@
 import { GoogleGenAI } from "@google/genai";
 
 export class Agent {
-  private genAi: GoogleGenAI;
+    private genAi: GoogleGenAI;
 
-  constructor(api_key: string) {
-    this.genAi = new GoogleGenAI({ apiKey: api_key });
-  }
+    constructor(api_key: string) {
+        this.genAi = new GoogleGenAI({ apiKey: api_key });
+    }
 
-  async execMission(goal: string) {
-    const prompt = `
+    async execMission(goal: string) {
+        const prompt = `
       Your mission is: "${goal}".
 Return only the array.
     `;
 
-    const response = await this.genAi.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: `You are the AgentMesh Brain, a High-Level Systems Architect.
+        const response = await this.genAi.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: `You are the AgentMesh Brain, a High-Level Systems Architect.
   Your job is to decompose a complex mission into a logical, sequential JSON array of tasks.
 
   RULES:
@@ -28,14 +28,14 @@ Return only the array.
   5. Each step should include an inputContext (JSON object) for any specific technical parameters, constants, or reference URLs needed for that specific step.
   6. Each task can optionally include a dependsOn array containing the 'order' numbers of tasksthat must be completed first. (e.g if Task 3 needs task 1, then Task 3 should have dependsOn: [1])
 `,
-      },
-    });
+            },
+        });
 
-    return response.text;
-  }
+        return response.text;
+    }
 
-  async execTask(taskDesc: string, history: string, missionGoal: string) {
-    const prompt = `
+    async execTask(taskDesc: string, history: string, missionGoal: string) {
+        const prompt = `
     OVERALL MISSION GOAL: ${missionGoal}
 
     HISTORY OF COMPLETED STEPS:
@@ -45,18 +45,18 @@ Return only the array.
     ${taskDesc}
 `;
 
-    const response = await this.genAi.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: `You are an autonomous Executor.
+        const response = await this.genAi.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: `You are an autonomous Executor.
   You receive a history of work and a specific task.
   Your job is to output ONLY the direct result of the task.
   If the task asks for code, return only code. If it asks for a summary, return only the summary.
   NO conversational filler like "Here is the result" or "I have finished the task".`,
-      },
-    });
+            },
+        });
 
-    return response.text;
-  }
+        return response.text;
+    }
 }
