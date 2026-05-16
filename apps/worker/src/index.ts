@@ -17,6 +17,10 @@ interface CreateTask {
   inputContext: InputJsonValue;
 }
 
+interface ModelResponse extends Task {
+  dependsOn: Array<number>;
+}
+
 const poll = async () => {
   try {
     const completedTask = await tryTask();
@@ -37,27 +41,21 @@ const tryTask = async () => {
   const task = await db.task.findFirst({
     where: {
       status: TaskStatus.WAITING,
-      mission: {
-        status: MissionStatus.RUNNING,
+      mission: { status: MissionStatus.RUNNING },
+      dependencies: {
+        none: { status: { not: TaskStatus.COMPLETED } },
       },
     },
-    orderBy: {
-      order: "asc",
-    },
+    orderBy: { order: "asc" },
 
-    include: {
-      mission: true,
-    },
+    include: { mission: true, dependencies: true },
   });
+
   // If we find one act on it
   if (task) {
     await db.task.update({
-      where: {
-        id: task.id,
-      },
-      data: {
-        status: TaskStatus.ACTIVE,
-      },
+      where: { id: task.id },
+      data: { status: TaskStatus.ACTIVE },
     });
     console.log(
       `Found task: [${task.id}] - Goal : ${task.description} - Starting execution ...`
@@ -65,24 +63,12 @@ const tryTask = async () => {
 
     // Get a history of all the previously completed tasks for the same mission for the agent
 
-    const history = await db.task.findMany({
-      where: {
-        missionId: task.missionId,
-        status: TaskStatus.COMPLETED,
-      },
-      orderBy: {
-        order: "asc",
-      },
-    });
-
-    const reducedHistory = history.slice(
-      history.length - 1 - NUM_TASKS_IN_HISTORY
-    );
+    const history = task.dependencies.slice(-NUM_TASKS_IN_HISTORY);
 
     let historyString = `
   #Previous Work Done:\n
 `;
-    reducedHistory.map((currTask) => {
+    history.forEach((currTask) => {
       historyString += `###Task: ${currTask.title} | ###Result: ${currTask.outputResult?.toString()}\n`;
     });
 
@@ -98,14 +84,10 @@ const tryTask = async () => {
       }
 
       console.log(response);
-
       console.log("Task completed.");
 
       await db.task.update({
-        where: {
-          id: task.id,
-        },
-
+        where: { id: task.id },
         data: {
           status: TaskStatus.COMPLETED,
           outputResult: response,
@@ -115,23 +97,16 @@ const tryTask = async () => {
       const count = await db.task.count({
         where: {
           missionId: task.missionId,
-          status: {
-            not: TaskStatus.COMPLETED,
-          },
+          status: { not: TaskStatus.COMPLETED },
         },
       });
 
       if (count === 0) {
         await db.mission.update({
-          where: {
-            id: task.missionId,
-          },
-          data: {
-            status: MissionStatus.COMPLETED,
-          },
+          where: { id: task.missionId },
+          data: { status: MissionStatus.COMPLETED },
         });
       }
-
       return task;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -140,38 +115,25 @@ const tryTask = async () => {
       );
       console.error(msg);
       await db.task.update({
-        where: {
-          id: task.id,
-        },
-        data: {
-          status: TaskStatus.FAILED,
-        },
+        where: { id: task.id },
+        data: { status: TaskStatus.FAILED },
       });
 
       await db.mission.update({
-        where: {
-          id: task.missionId,
-        },
-        data: {
-          status: MissionStatus.FAILED,
-        },
+        where: { id: task.missionId },
+        data: { status: MissionStatus.FAILED },
       });
 
       throw e;
     }
   }
-
   return null;
 };
 
 const tryMission = async () => {
   const mission = await db.mission.findFirst({
-    where: {
-      status: MissionStatus.PENDING,
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
+    where: { status: MissionStatus.PENDING },
+    orderBy: { createdAt: "asc" },
   });
 
   if (mission) {
@@ -179,12 +141,8 @@ const tryMission = async () => {
       `Found mission: [${mission.id}] - Goal : ${mission.goal} - Starting execution ...`
     );
     await db.mission.update({
-      where: {
-        id: mission.id,
-      },
-      data: {
-        status: MissionStatus.RUNNING,
-      },
+      where: { id: mission.id },
+      data: { status: MissionStatus.RUNNING },
     });
 
     const response = await agent.execMission(mission.goal);
@@ -200,22 +158,16 @@ const tryMission = async () => {
 
     if (!clean_response) {
       await db.mission.update({
-        where: {
-          id: mission.id,
-        },
-        data: {
-          status: MissionStatus.FAILED,
-        },
+        where: { id: mission.id },
+        data: { status: MissionStatus.FAILED },
       });
       console.log("Invalid response");
       return;
     }
-
     console.log(clean_response[0]);
     // Parse json
-
     try {
-      const parsed_res: Array<Task> = JSON.parse(clean_response[0]);
+      const parsed_res: Array<ModelResponse> = JSON.parse(clean_response[0]);
       let newTasks: Array<CreateTask> = [];
 
       parsed_res.map((currTask) => {
@@ -224,27 +176,50 @@ const tryMission = async () => {
           description: currTask.description,
           order: currTask.order,
           missionId: mission.id,
-          type: currTask.type,
+          type: currTask.type ?? TaskType.CODE,
           status: TaskStatus.WAITING,
           inputContext: currTask.inputContext ?? {},
         });
       });
 
-      await db.task.createMany({
-        data: newTasks,
+      await db.task.createMany({ data: newTasks });
+
+      const createdTasks = await db.task.findMany({
+        where: { missionId: mission.id },
+        select: { id: true, order: true },
       });
+
+      const orderToId = new Map<number, string>(
+        createdTasks.map((t) => [t.order, t.id])
+      );
+
+      const updatePromises = parsed_res
+        .filter(
+          (currTask) =>
+            currTask.dependsOn &&
+            Array.isArray(currTask.dependsOn) &&
+            currTask.dependsOn.length > 0
+        )
+        .map((currTask) => {
+          const childTaskId = orderToId.get(currTask.order);
+          const connectIds = currTask.dependsOn
+            .map((parentOrder) => orderToId.get(parentOrder))
+            .filter((id) => !!id)
+            .map((id) => ({ id: id }));
+          if (!childTaskId || connectIds.length == 0) return null;
+          return db.task.update({
+            where: { id: childTaskId },
+            data: { dependencies: { connect: connectIds } },
+          });
+        })
+        .filter((promise) => promise != null);
+
+      await Promise.all(updatePromises);
     } catch (e: unknown) {
-      if (e instanceof SyntaxError) {
-        console.log("Error parsing the response to JSON");
-        await db.mission.update({
-          where: {
-            id: mission.id,
-          },
-          data: {
-            status: MissionStatus.FAILED,
-          },
-        });
-      }
+      await db.mission.update({
+        where: { id: mission.id },
+        data: { status: MissionStatus.FAILED },
+      });
     }
   }
 };

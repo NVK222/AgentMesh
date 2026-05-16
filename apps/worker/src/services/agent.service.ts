@@ -22,10 +22,12 @@ Return only the array.
 
   RULES:
   1. Output ONLY a raw JSON array. No markdown, no backticks, no prose.
-  2. Schema: { "title": string, "description": string, "order": number, "type": "CODE" | "RESEARCH" | "REVIEW" | "DEPLOY", inputContext: JSON (optional) }
+  2. Schema: { "title": string, "description": string, "order": number, "type": "CODE" | "RESEARCH" | "REVIEW" | "DEPLOY", "inputContext": JSON (optional), "dependsOn": array (optional) }
   3. Context: Each description MUST be self-contained. The sub-agent reading it won't see the original mission goal.
   4. Sequence: Orders must be strictly incrementing (1, 2, 3...).
-  5. Each step should include an inputContext (JSON object) for any specific technical parameters, constants, or reference URLs needed for that specific step.`,
+  5. Each step should include an inputContext (JSON object) for any specific technical parameters, constants, or reference URLs needed for that specific step.
+  6. Each task can optionally include a dependsOn array containing the 'order' numbers of tasksthat must be completed first. (e.g if Task 3 needs task 1, then Task 3 should have dependsOn: [1])
+`,
       },
     });
 
