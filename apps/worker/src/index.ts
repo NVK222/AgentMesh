@@ -23,161 +23,148 @@ interface ModelResponse extends Task {
 
 const poll = async () => {
     try {
-        const completedTask = await tryTask();
-        if (!completedTask) {
+        if (!(await tryTasks())) {
             await tryMission();
         }
     } catch (e: unknown) {
         if (e instanceof Error) {
-            console.error("Worker Error:  ", e.message);
+            console.error(e.message);
         }
     } finally {
         setTimeout(poll, 5000);
     }
 };
 
-const tryTask = async () => {
-    // Get a task from a running mission to try to complete
-    const task = await db.task.findFirst({
+const tryTasks = async () => {
+    // Get all tasks whose dependencies have been fulfilled
+    const readyTasks = await db.task.findMany({
         where: {
             status: TaskStatus.WAITING,
             mission: { status: MissionStatus.RUNNING },
-            dependencies: {
-                none: { status: { not: TaskStatus.COMPLETED } },
-            },
+            dependencies: { none: { status: { not: TaskStatus.COMPLETED } } },
         },
         orderBy: { order: "asc" },
-
         include: { mission: true, dependencies: true },
     });
 
-    // If we find one act on it
-    if (task) {
+    if (readyTasks.length === 0) return null;
+    console.log(
+        `[ORCHESTRATOR] found ${readyTasks.length} tasks. Running in parallel`
+    );
+
+    const missionId = readyTasks.at(0)?.missionId;
+
+    const promises = readyTasks.map(async (task) => {
+        //Update their status to active
         await db.task.update({
             where: { id: task.id },
             data: { status: TaskStatus.ACTIVE },
         });
-        console.log(
-            `Found task: [${task.id}] - Goal : ${task.description} - Starting execution ...`
-        );
-
-        // Get a history of all the previously completed tasks for the same mission for the agent
-
-        const history = task.dependencies.slice(-NUM_TASKS_IN_HISTORY);
-
-        let historyString = `
-  #Previous Work Done:\n
-`;
-        history.forEach((currTask) => {
-            historyString += `###Task: ${currTask.title} | ###Result: ${currTask.outputResult?.toString()}\n`;
-        });
 
         try {
-            const response = await agent.execTask(
+            //Create a history string for the agent
+            const history = task.dependencies.slice(-NUM_TASKS_IN_HISTORY);
+            let historyString = `#Previous Work Done:\n`;
+            history.forEach((currTask) => {
+                historyString += `###Task: ${currTask.title} | ###Result: ${currTask.outputResult?.toString()}\n`;
+            });
+
+            const agentResponse = await agent.execTask(
                 task.description,
                 historyString,
                 task.mission.goal
             );
-
-            if (!response || response.includes('"error":')) {
-                throw new Error(response || "Empty response from agent");
-            }
-
-            console.log(response);
-            console.log("Task completed.");
+            if (!agentResponse || agentResponse.includes('"error":'))
+                throw new Error("Worker Agent task failed.");
 
             await db.task.update({
                 where: { id: task.id },
                 data: {
                     status: TaskStatus.COMPLETED,
-                    outputResult: response,
+                    outputResult: agentResponse,
                 },
             });
-
-            const count = await db.task.count({
-                where: {
-                    missionId: task.missionId,
-                    status: { not: TaskStatus.COMPLETED },
-                },
-            });
-
-            if (count === 0) {
-                await db.mission.update({
-                    where: { id: task.missionId },
-                    data: { status: MissionStatus.COMPLETED },
-                });
-            }
-            return task;
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            console.error(
-                `Task ${task.id} failed. Failing Mission ${task.missionId}.`
-            );
-            console.error(msg);
+        } catch (e) {
+            // If any task fails, immediately sets the task and its mission to FAILED
             await db.task.update({
                 where: { id: task.id },
                 data: { status: TaskStatus.FAILED },
             });
-
             await db.mission.update({
-                where: { id: task.missionId },
+                where: { id: task.mission.id },
                 data: { status: MissionStatus.FAILED },
             });
 
             throw e;
         }
+    });
+
+    await Promise.all(promises);
+
+    const remainingTasksForMission = await db.task.count({
+        where: {
+            missionId: missionId,
+            status: { not: TaskStatus.COMPLETED },
+        },
+    });
+
+    if (remainingTasksForMission === 0) {
+        await db.mission.update({
+            where: { id: missionId },
+            data: { status: MissionStatus.COMPLETED },
+        });
     }
-    return null;
+
+    return true;
 };
 
 const tryMission = async () => {
-    const mission = await db.mission.findFirst({
+    // Find a pending mission
+    const currentMission = await db.mission.findFirst({
         where: { status: MissionStatus.PENDING },
         orderBy: { createdAt: "asc" },
     });
 
-    if (mission) {
+    if (currentMission) {
         console.log(
-            `Found mission: [${mission.id}] - Goal : ${mission.goal} - Starting execution ...`
+            `Found mission: [${currentMission.id}] - Goal : ${currentMission.goal} - Starting execution ...`
         );
+
+        //Set its status to RUNNING
         await db.mission.update({
-            where: { id: mission.id },
+            where: { id: currentMission.id },
             data: { status: MissionStatus.RUNNING },
         });
 
-        const response = await agent.execMission(mission.goal);
+        const agentResponse = await agent.execMission(currentMission.goal);
 
-        if (!response) {
-            console.error("No response");
-            return;
-        }
+        if (!agentResponse || agentResponse.includes('"error":'))
+            throw new Error("Orchestraitor Agent mission execution failed.");
 
         // Clean response using regex
         const regex = /\[[\s\S]*\]/;
-        const clean_response = regex.exec(response);
+        const cleanedAgentResponse = regex.exec(agentResponse);
 
-        if (!clean_response) {
+        if (!cleanedAgentResponse) {
             await db.mission.update({
-                where: { id: mission.id },
+                where: { id: currentMission.id },
                 data: { status: MissionStatus.FAILED },
             });
-            console.log("Invalid response");
-            return;
+            throw new Error("Orchestraitor Agent response was invalid");
         }
-        console.log(clean_response[0]);
-        // Parse json
+        // Parse the agent response to JSON
         try {
-            const parsed_res: Array<ModelResponse> = JSON.parse(
-                clean_response[0]
+            const parsedAgentResponse: Array<ModelResponse> = JSON.parse(
+                cleanedAgentResponse[0]
             );
             let newTasks: Array<CreateTask> = [];
 
-            parsed_res.map((currTask) => {
+            parsedAgentResponse.map((currTask) => {
                 newTasks.push({
                     title: currTask.title,
                     description: currTask.description,
                     order: currTask.order,
-                    missionId: mission.id,
+                    missionId: currentMission.id,
                     type: currTask.type ?? TaskType.CODE,
                     status: TaskStatus.WAITING,
                     inputContext: currTask.inputContext ?? {},
@@ -186,8 +173,9 @@ const tryMission = async () => {
 
             await db.task.createMany({ data: newTasks });
 
+            // Get IDs of tasks that were just pushed
             const createdTasks = await db.task.findMany({
-                where: { missionId: mission.id },
+                where: { missionId: currentMission.id },
                 select: { id: true, order: true },
             });
 
@@ -195,7 +183,8 @@ const tryMission = async () => {
                 createdTasks.map((t) => [t.order, t.id])
             );
 
-            const updatePromises = parsed_res
+            // Create array of IDs
+            const updatePromises = parsedAgentResponse
                 .filter(
                     (currTask) =>
                         currTask.dependsOn &&
@@ -219,9 +208,10 @@ const tryMission = async () => {
             await Promise.all(updatePromises);
         } catch (e: unknown) {
             await db.mission.update({
-                where: { id: mission.id },
+                where: { id: currentMission.id },
                 data: { status: MissionStatus.FAILED },
             });
+            throw new Error(`Unknown Error occured :  ${e}`);
         }
     }
 };
