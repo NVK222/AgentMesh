@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { TaskType } from "./generated/client/enums";
 
 export const CreateMissionSchema = z.object({
     goal: z
@@ -6,4 +7,19 @@ export const CreateMissionSchema = z.object({
         .min(1, "The goal cannot be empty"),
 });
 
+export const AgentMissionExecResultSchema = z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    order: z.number().int().positive(),
+    type: z.enum(TaskType).catch(TaskType.CODE),
+    inputContext: z.json().optional(),
+    dependsOn: z.array(z.number().int().positive()).optional().default([]),
+});
+
 export type CreateMissionInput = z.infer<typeof CreateMissionSchema>;
+export type AgentMissionExecResult = z.infer<
+    typeof AgentMissionExecResultSchema
+>;
+export const AgentMissionExecResultArray = z.array(
+    AgentMissionExecResultSchema
+);
