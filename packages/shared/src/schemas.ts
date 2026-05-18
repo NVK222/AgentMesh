@@ -12,8 +12,8 @@ export const AgentMissionExecResultSchema = z.object({
     description: z.string().min(1),
     order: z.number().int().positive(),
     type: z.enum(TaskType).catch(TaskType.CODE),
-    inputContext: z.json().optional(),
-    dependsOn: z.array(z.number().int().positive()).optional().default([]),
+    inputContext: z.json(),
+    dependsOn: z.array(z.number().int().positive()),
 });
 
 export type CreateMissionInput = z.infer<typeof CreateMissionSchema>;

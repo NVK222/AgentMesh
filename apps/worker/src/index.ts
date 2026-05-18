@@ -1,10 +1,19 @@
-import { db, MissionStatus, TaskStatus, TaskType } from "@agentmesh/shared";
+import {
+    AgentMissionExecResultArray,
+    db,
+    MissionStatus,
+    TaskStatus,
+    TaskType,
+} from "@agentmesh/shared";
 import { Agent } from "./services/agent.service";
 import "dotenv/config";
-import type { Task } from "packages/shared/src/generated/client/client";
 import type { InputJsonValue } from "packages/shared/src/generated/client/internal/prismaNamespace";
+import { flattenError, ZodError } from "zod";
 
-const agent = new Agent(process.env.GEMINI_API_KEY ?? "");
+const agent = new Agent(
+    process.env.GEMINI_API_KEY ?? "",
+    "gemini-3.1-flash-lite"
+);
 const NUM_TASKS_IN_HISTORY = 5;
 
 interface CreateTask {
@@ -17,17 +26,15 @@ interface CreateTask {
     inputContext: InputJsonValue;
 }
 
-interface ModelResponse extends Task {
-    dependsOn: Array<number>;
-}
-
 const poll = async () => {
     try {
         if (!(await tryTasks())) {
             await tryMission();
         }
     } catch (e: unknown) {
-        if (e instanceof Error) {
+        if (e instanceof ZodError) {
+            console.error(flattenError(e).fieldErrors);
+        } else if (e instanceof Error) {
             console.error(e.message);
         }
     } finally {
@@ -48,11 +55,11 @@ const tryTasks = async () => {
     });
 
     if (readyTasks.length === 0) return null;
-    console.log(
-        `[ORCHESTRATOR] found ${readyTasks.length} tasks. Running in parallel`
-    );
 
     const missionId = readyTasks.at(0)?.missionId;
+    console.log(
+        `[ORCHESTRATOR] found ${readyTasks.length} tasks for mission ${missionId}. Running in parallel`
+    );
 
     const promises = readyTasks.map(async (task) => {
         //Update their status to active
@@ -63,19 +70,38 @@ const tryTasks = async () => {
 
         try {
             //Create a history string for the agent
-            const history = task.dependencies.slice(-NUM_TASKS_IN_HISTORY);
-            let historyString = `#Previous Work Done:\n`;
-            history.forEach((currTask) => {
-                historyString += `###Task: ${currTask.title} | ###Result: ${currTask.outputResult?.toString()}\n`;
-            });
+            let history = `# Dependency data:\n`;
+
+            if (task.dependencies.length === 0) {
+                history += `None (This is a root task.)`;
+            } else {
+                task.dependencies
+                    .slice(-NUM_TASKS_IN_HISTORY)
+                    .forEach((parent) => {
+                        const result =
+                            typeof parent.outputResult === "string"
+                                ? parent.outputResult
+                                : JSON.stringify(parent.outputResult, null, 2);
+                        history += `### Task ${parent.order} : ${parent.title}\n`;
+                        history += `### Result:\n${result}`;
+                    });
+            }
+
+            console.log(
+                `[WORKER] History for task order ${task.order} :  ${history}`
+            );
 
             const agentResponse = await agent.execTask(
                 task.description,
-                historyString,
+                history,
                 task.mission.goal
             );
             if (!agentResponse || agentResponse.includes('"error":'))
                 throw new Error("Worker Agent task failed.");
+
+            console.log(
+                `[AGENT] response for task order ${task.order} ${agentResponse}`
+            );
 
             await db.task.update({
                 where: { id: task.id },
@@ -138,25 +164,16 @@ const tryMission = async () => {
 
         const agentResponse = await agent.execMission(currentMission.goal);
 
+        console.log(`[RAW AGENT] ${agentResponse}`);
+
         if (!agentResponse || agentResponse.includes('"error":'))
-            throw new Error("Orchestraitor Agent mission execution failed.");
+            throw new Error("Orchestrator Agent mission execution failed.");
 
-        // Clean response using regex
-        const regex = /\[[\s\S]*\]/;
-        const cleanedAgentResponse = regex.exec(agentResponse);
-
-        if (!cleanedAgentResponse) {
-            await db.mission.update({
-                where: { id: currentMission.id },
-                data: { status: MissionStatus.FAILED },
-            });
-            throw new Error("Orchestraitor Agent response was invalid");
-        }
         // Parse the agent response to JSON
         try {
-            const parsedAgentResponse: Array<ModelResponse> = JSON.parse(
-                cleanedAgentResponse[0]
-            );
+            const jsonAgentResponse = JSON.parse(agentResponse);
+            const parsedAgentResponse =
+                AgentMissionExecResultArray.parse(jsonAgentResponse);
             let newTasks: Array<CreateTask> = [];
 
             parsedAgentResponse.map((currTask) => {
@@ -169,6 +186,8 @@ const tryMission = async () => {
                     status: TaskStatus.WAITING,
                     inputContext: currTask.inputContext ?? {},
                 });
+
+                console.log(`${currTask.title} -- ${currTask.order}`);
             });
 
             await db.task.createMany({ data: newTasks });
@@ -211,6 +230,7 @@ const tryMission = async () => {
                 where: { id: currentMission.id },
                 data: { status: MissionStatus.FAILED },
             });
+            if (e instanceof ZodError) throw e;
             throw new Error(`Unknown Error occured :  ${e}`);
         }
     }
