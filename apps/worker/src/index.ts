@@ -16,6 +16,7 @@ const agent = new Agent(
     "gemini-3.1-flash-lite"
 );
 const NUM_TASKS_IN_HISTORY = 5;
+const MAX_RETRIES = 3;
 
 interface CreateTask {
     missionId: string;
@@ -108,15 +109,30 @@ const tryTasks = async () => {
             });
             logger.success(`Task ${task.id} completed successfully`);
         } catch (e) {
-            // If any task fails, immediately sets the task and its mission to FAILED
-            await db.task.update({
+            // If any task fails, retry if attempts less than MAX_TRIEs
+
+            const updatedTask = await db.task.update({
                 where: { id: task.id },
-                data: { status: TaskStatus.FAILED },
+                data: { attempts: { increment: 1 } },
             });
-            await db.mission.update({
-                where: { id: task.mission.id },
-                data: { status: MissionStatus.FAILED },
-            });
+            if (updatedTask.attempts < MAX_RETRIES) {
+                logger.worker(
+                    `Task ${task.id} failed. Attempt ${task.attempts}/${MAX_RETRIES}. Retrying...`
+                );
+                await db.task.update({
+                    where: { id: task.id },
+                    data: { status: TaskStatus.WAITING },
+                });
+            } else {
+                await db.task.update({
+                    where: { id: task.id },
+                    data: { status: TaskStatus.FAILED },
+                });
+                await db.mission.update({
+                    where: { id: task.mission.id },
+                    data: { status: MissionStatus.FAILED },
+                });
+            }
 
             throw e;
         }

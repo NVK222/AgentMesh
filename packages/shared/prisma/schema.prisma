@@ -40,39 +40,40 @@ enum TaskType {
 }
 
 model Mission {
-  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   goal          String
-  status        MissionStatus     @default(PENDING)
-  totalTokens   Int               @default(0)
-  cost          Float             @default(0)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  status        MissionStatus       @default(PENDING)
+  totalTokens   Int                 @default(0)
+  cost          Float               @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   tasks         Task[]
 }
 
 model Task {
 
-  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mission       Mission           @relation(fields:[missionId], references:[id])
-  missionId     String            @db.Uuid
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mission       Mission             @relation(fields:[missionId], references:[id])
+  missionId     String              @db.Uuid
   type          TaskType
-  status        TaskStatus        @default(WAITING)
+  status        TaskStatus          @default(WAITING)
   title         String
   description   String
   order         Int
   inputContext  Json
   outputResult  Json?
-  dependencies  Task[]            @relation("TaskGraph")
-  dependedOnBy  Task[]            @relation("TaskGraph")
+  dependencies  Task[]              @relation("TaskGraph")
+  dependedOnBy  Task[]              @relation("TaskGraph")
   logs          AgentLog[]
+  attempts      Int                 @default(0)
 }
 
 model AgentLog {
 
-  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task       Task       @relation(fields:[taskid], references:[id])
-  taskid     String     @db.Uuid
+  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task       Task                   @relation(fields:[taskid], references:[id])
+  taskid     String                 @db.Uuid
   agentRole  String
   content    String
-  createdAt  DateTime   @default(now())
+  createdAt  DateTime               @default(now())
 }
