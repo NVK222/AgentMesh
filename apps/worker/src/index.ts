@@ -9,6 +9,7 @@ import { Agent } from "./services/agent.service";
 import "dotenv/config";
 import type { InputJsonValue } from "packages/shared/src/generated/client/internal/prismaNamespace";
 import { flattenError, ZodError } from "zod";
+import { logger } from "./utils/logger";
 
 const agent = new Agent(
     process.env.GEMINI_API_KEY ?? "",
@@ -35,7 +36,7 @@ const poll = async () => {
         if (e instanceof ZodError) {
             console.error(flattenError(e).fieldErrors);
         } else if (e instanceof Error) {
-            console.error(e.message);
+            logger.error(e.message);
         }
     } finally {
         setTimeout(poll, 5000);
@@ -57,8 +58,8 @@ const tryTasks = async () => {
     if (readyTasks.length === 0) return null;
 
     const missionId = readyTasks.at(0)?.missionId;
-    console.log(
-        `[ORCHESTRATOR] found ${readyTasks.length} tasks for mission ${missionId}. Running in parallel`
+    logger.orchestrator(
+        `Found ${readyTasks.length} tasks for mission ${missionId}. Running in parallel`
     );
 
     const promises = readyTasks.map(async (task) => {
@@ -69,6 +70,7 @@ const tryTasks = async () => {
         });
 
         try {
+            logger.debug(`Creating history string for task ${task.id}`);
             //Create a history string for the agent
             let history = `# Dependency data:\n`;
 
@@ -87,10 +89,6 @@ const tryTasks = async () => {
                     });
             }
 
-            console.log(
-                `[WORKER] History for task order ${task.order} :  ${history}`
-            );
-
             const agentResponse = await agent.execTask(
                 task.description,
                 history,
@@ -99,9 +97,7 @@ const tryTasks = async () => {
             if (!agentResponse || agentResponse.includes('"error":'))
                 throw new Error("Worker Agent task failed.");
 
-            console.log(
-                `[AGENT] response for task order ${task.order} ${agentResponse}`
-            );
+            logger.worker(`Response for task ${task.id} ${agentResponse}`);
 
             await db.task.update({
                 where: { id: task.id },
@@ -110,6 +106,7 @@ const tryTasks = async () => {
                     outputResult: agentResponse,
                 },
             });
+            logger.success(`Task ${task.id} completed successfully`);
         } catch (e) {
             // If any task fails, immediately sets the task and its mission to FAILED
             await db.task.update({
@@ -139,6 +136,7 @@ const tryTasks = async () => {
             where: { id: missionId },
             data: { status: MissionStatus.COMPLETED },
         });
+        logger.success(`Mission ${missionId} completed successfully.`);
     }
 
     return true;
@@ -152,7 +150,7 @@ const tryMission = async () => {
     });
 
     if (currentMission) {
-        console.log(
+        logger.orchestrator(
             `Found mission: [${currentMission.id}] - Goal : ${currentMission.goal} - Starting execution ...`
         );
 
@@ -164,7 +162,7 @@ const tryMission = async () => {
 
         const agentResponse = await agent.execMission(currentMission.goal);
 
-        console.log(`[RAW AGENT] ${agentResponse}`);
+        logger.orchestrator(`Response:\n${agentResponse}`);
 
         if (!agentResponse || agentResponse.includes('"error":'))
             throw new Error("Orchestrator Agent mission execution failed.");
@@ -186,11 +184,13 @@ const tryMission = async () => {
                     status: TaskStatus.WAITING,
                     inputContext: currTask.inputContext ?? {},
                 });
-
-                console.log(`${currTask.title} -- ${currTask.order}`);
             });
 
             await db.task.createMany({ data: newTasks });
+
+            logger.success(
+                `${parsedAgentResponse.length.toString()} tasks were created.`
+            );
 
             // Get IDs of tasks that were just pushed
             const createdTasks = await db.task.findMany({
