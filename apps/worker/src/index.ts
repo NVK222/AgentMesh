@@ -70,6 +70,14 @@ const tryTasks = async () => {
             data: { status: TaskStatus.ACTIVE },
         });
 
+        await db.agentLog.create({
+            data: {
+                taskid: task.id,
+                agentRole: "WORKER",
+                content: `Starting execution of task for type ${task.type}`,
+            },
+        });
+
         try {
             logger.debug(`Creating history string for task ${task.id}`);
             //Create a history string for the agent
@@ -90,6 +98,14 @@ const tryTasks = async () => {
                     });
             }
 
+            await db.agentLog.create({
+                data: {
+                    taskid: task.id,
+                    agentRole: "WORKER",
+                    content: `History of ${task.dependencies.length} tasks added to context.`,
+                },
+            });
+
             const agentResponse = await agent.execTask(
                 task.description,
                 history,
@@ -99,6 +115,14 @@ const tryTasks = async () => {
                 throw new Error("Worker Agent task failed.");
 
             logger.worker(`Response for task ${task.id} ${agentResponse}`);
+
+            await db.agentLog.create({
+                data: {
+                    taskid: task.id,
+                    agentRole: task.type,
+                    content: agentResponse,
+                },
+            });
 
             await db.task.update({
                 where: { id: task.id },
@@ -131,6 +155,16 @@ const tryTasks = async () => {
                 await db.mission.update({
                     where: { id: task.mission.id },
                     data: { status: MissionStatus.FAILED },
+                });
+                await db.agentLog.create({
+                    data: {
+                        taskid: task.id,
+                        agentRole: "ERROR",
+                        content:
+                            e instanceof Error
+                                ? e.message
+                                : "Unknown Error Occured.",
+                    },
                 });
             }
 
