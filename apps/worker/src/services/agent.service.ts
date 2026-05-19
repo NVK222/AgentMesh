@@ -94,7 +94,7 @@ CURRENT TASK TO EXECUTE: ${taskDesc}
 `;
 
         const response = await this.genAi.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: this.model,
             contents: prompt,
             config: {
                 systemInstruction: `You are an autonomous Executor.
