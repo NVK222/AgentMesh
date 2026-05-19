@@ -112,7 +112,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                         </header>
 
                         <div className="flex-1 min-h-0">
-                            <MissionGraph tasks={formattedTasks} />
+                            <MissionGraph
+                                key={targetMissionId}
+                                tasks={formattedTasks}
+                                missionId={targetMissionId}
+                            />
                         </div>
                     </React.Fragment>
                 ) : (
