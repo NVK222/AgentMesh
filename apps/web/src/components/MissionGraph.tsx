@@ -1,7 +1,7 @@
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ReactFlow, Background, Controls, MiniMap } from "@xyflow/react";
-import { TaskNode, type TaskNodeElement } from "./TaskNode";
+import { TaskNode } from "./TaskNode";
 import { getLayoutedElements, WorkspaceTask } from "@/utils/layout";
 import "@xyflow/react/dist/style.css";
 
@@ -22,24 +22,32 @@ export function MissionGraph({
     useEffect(() => {
         if (!missionId) return;
 
+        const isEmpty = currentTasks.length === 0;
         const eventSource = new EventSource(
-            `/api/stream?missionId=${missionId}`
+            `/api/stream?missionId=${missionId}&empty=${isEmpty}`
         );
 
         eventSource.onmessage = (event) => {
             try {
-                const updatedTaskStatuses = JSON.parse(event.data) as {
-                    id: string;
-                    status: string;
-                }[];
-                setCurrentTasks((prevTasks) =>
-                    prevTasks.map((task) => {
-                        const match = updatedTaskStatuses.find(
-                            (update) => update.id === task.id
-                        );
-                        return match ? { ...task, status: match.status } : task;
-                    })
-                );
+                const incomingData = JSON.parse(event.data);
+                if (!Array.isArray(incomingData) || incomingData.length === 0)
+                    return;
+
+                const isFullPayload = "title" in incomingData[0];
+                if (isFullPayload) {
+                    setCurrentTasks(incomingData as WorkspaceTask[]);
+                } else {
+                    setCurrentTasks((prevTasks) =>
+                        prevTasks.map((task) => {
+                            const match = incomingData.find(
+                                (update) => update.id === task.id
+                            );
+                            return match
+                                ? { ...task, status: match.status }
+                                : task;
+                        })
+                    );
+                }
             } catch (err) {
                 console.error(
                     "Failed to parse incoming streaming event matrix:",
@@ -56,9 +64,8 @@ export function MissionGraph({
         return () => {
             eventSource.close();
         };
-    }, [missionId]);
+    }, [missionId, currentTasks.length]);
 
-    // 3. Map our dynamic state tasks into D3 coordinates and edges
     const { nodes, edges } = useMemo(
         () => getLayoutedElements(currentTasks),
         [currentTasks]

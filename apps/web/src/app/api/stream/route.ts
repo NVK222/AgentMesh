@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const targetMissionId = searchParams.get("missionId");
+    const isCanvasEmpty = searchParams.get("empty") === "true";
 
     if (!targetMissionId) {
         return new Response("Missing missionId parameter", { status: 400 });
@@ -17,8 +18,8 @@ export async function GET(req: NextRequest) {
 
     // Hash to avoid duplicates
     let lastStateSignature = "";
+    let sentAllTasks = false;
 
-    // Set up an automated execution interval block
     const pollInterval = setInterval(async () => {
         if (req.signal.aborted) {
             clearInterval(pollInterval);
@@ -29,19 +30,46 @@ export async function GET(req: NextRequest) {
         }
 
         try {
-            const currentTasks = await db.task.findMany({
-                where: { missionId: targetMissionId },
-                select: { id: true, status: true },
-                orderBy: { order: "asc" },
-            });
+            const needFullDetails = isCanvasEmpty && !sentAllTasks;
+            let responseString = "";
 
-            const currentStateSignature = JSON.stringify(currentTasks);
+            if (needFullDetails) {
+                const fullTasks = await db.task.findMany({
+                    where: { missionId: targetMissionId },
+                    orderBy: { order: "asc" },
+                    include: { dependencies: { select: { order: true } } },
+                });
+
+                if (fullTasks.length > 0) {
+                    const fullPayload = fullTasks.map((t) => ({
+                        id: t.id,
+                        title: t.title,
+                        status: t.status,
+                        order: t.order,
+                        type: t.type || "CODE",
+                        dependsOn: t.dependencies.map((d) => d.order),
+                    }));
+
+                    responseString = JSON.stringify(fullPayload);
+                    sentAllTasks = true;
+                }
+            } else {
+                const statusTask = await db.task.findMany({
+                    where: { missionId: targetMissionId },
+                    orderBy: { order: "asc" },
+                    select: { id: true, status: true },
+                });
+
+                if (statusTask.length > 0) {
+                    responseString = JSON.stringify(statusTask);
+                }
+            }
 
             // If a task changed state, broadcast the updated matrix immediately
-            if (currentStateSignature !== lastStateSignature) {
-                lastStateSignature = currentStateSignature;
+            if (responseString && responseString !== lastStateSignature) {
+                lastStateSignature = responseString;
                 await writer.write(
-                    encoder.encode(`data: ${JSON.stringify(currentTasks)}\n\n`)
+                    encoder.encode(`data: ${responseString}\n\n`)
                 );
             }
         } catch (err) {
