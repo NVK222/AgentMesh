@@ -74,9 +74,9 @@ const tryTasks = async () => {
         await db.agentLog.create({
             data: {
                 taskId: task.id,
-                agentRole: `WORKER ${task.type}`,
+                agentRole: `WORKER [${task.type}]`,
                 logType: LogType.INFO,
-                content: `Starting execution of task.`,
+                content: "Starting execution of task.",
             },
         });
 
