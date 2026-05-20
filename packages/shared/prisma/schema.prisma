@@ -39,6 +39,13 @@ enum TaskType {
   DEPLOY
 }
 
+enum LogType {
+    INFO
+    CONTEXT
+    AGENT_RESPONSE
+    ERROR
+}
+
 model Mission {
   id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   goal          String
@@ -48,12 +55,13 @@ model Mission {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   tasks         Task[]
+  logs          AgentLog[]
 }
 
 model Task {
 
   id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mission       Mission             @relation(fields:[missionId], references:[id])
+  mission       Mission             @relation(fields:[missionId], references:[id], onDelete: Cascade)
   missionId     String              @db.Uuid
   type          TaskType
   status        TaskStatus          @default(WAITING)
@@ -69,11 +77,13 @@ model Task {
 }
 
 model AgentLog {
-
-  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task       Task                   @relation(fields:[taskid], references:[id])
-  taskid     String                 @db.Uuid
-  agentRole  String
-  content    String
-  createdAt  DateTime               @default(now())
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentRole     String
+  logType       LogType                 @default(INFO)
+  content       String
+  createdAt     DateTime                @default(now())
+  task          Task?                   @relation(fields:[taskId], references:[id], onDelete: Cascade)
+  taskId        String?                 @db.Uuid
+  mission       Mission?                @relation(fields:[missionId], references:[id], onDelete: Cascade)
+  missionId     String?                 @db.Uuid
 }
