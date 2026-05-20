@@ -55,6 +55,7 @@ model Mission {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   tasks         Task[]
+  logs          AgentLog[]
 }
 
 model Task {
@@ -76,12 +77,13 @@ model Task {
 }
 
 model AgentLog {
-
-  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task       Task                   @relation(fields:[taskid], references:[id], onDelete: Cascade)
-  taskid     String                 @db.Uuid
-  agentRole  String
-  logType    LogType                @default(INFO)
-  content    String
-  createdAt  DateTime               @default(now())
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentRole     String
+  logType       LogType                 @default(INFO)
+  content       String
+  createdAt     DateTime                @default(now())
+  task          Task?                   @relation(fields:[taskId], references:[id], onDelete: Cascade)
+  taskId        String?                 @db.Uuid
+  mission       Mission?                @relation(fields:[missionId], references:[id], onDelete: Cascade)
+  missionId     String?                 @db.Uuid
 }
