@@ -1,6 +1,7 @@
 import {
     AgentMissionExecResultArray,
     db,
+    LogType,
     MissionStatus,
     TaskStatus,
     TaskType,
@@ -74,7 +75,8 @@ const tryTasks = async () => {
             data: {
                 taskid: task.id,
                 agentRole: "WORKER",
-                content: `Starting execution of task for type ${task.type}`,
+                logType: LogType.INFO,
+                content: `Starting execution of task.`,
             },
         });
 
@@ -101,8 +103,9 @@ const tryTasks = async () => {
             await db.agentLog.create({
                 data: {
                     taskid: task.id,
-                    agentRole: "WORKER",
-                    content: `History of ${task.dependencies.length} tasks added to context.`,
+                    agentRole: `WORKER [${task.type}]`,
+                    logType: LogType.CONTEXT,
+                    content: `Context from tasks ${task.dependencies.length} has been added.`,
                 },
             });
 
@@ -119,7 +122,8 @@ const tryTasks = async () => {
             await db.agentLog.create({
                 data: {
                     taskid: task.id,
-                    agentRole: task.type,
+                    agentRole: `WORKER [${task.type}]`,
+                    logType: LogType.AGENT_RESPONSE,
                     content: agentResponse,
                 },
             });
@@ -159,7 +163,8 @@ const tryTasks = async () => {
                 await db.agentLog.create({
                     data: {
                         taskid: task.id,
-                        agentRole: "ERROR",
+                        agentRole: "[WORKER]",
+                        logType: LogType.ERROR,
                         content:
                             e instanceof Error
                                 ? e.message
