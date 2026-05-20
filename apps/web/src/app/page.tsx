@@ -3,6 +3,7 @@ import { db } from "@agentmesh/shared";
 import { MissionGraph } from "@/components/MissionGraph";
 import React from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { TerminalPane } from "@/components/TerminalPane";
 
 interface PageProps {
     searchParams: Promise<{ missionId?: string }>;
@@ -77,6 +78,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                                 missionId={targetMissionId}
                             />
                         </div>
+
+                        <TerminalPane missionId={targetMissionId} />
                     </React.Fragment>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/10">
