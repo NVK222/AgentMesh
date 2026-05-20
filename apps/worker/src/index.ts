@@ -73,8 +73,8 @@ const tryTasks = async () => {
 
         await db.agentLog.create({
             data: {
-                taskid: task.id,
-                agentRole: "WORKER",
+                taskId: task.id,
+                agentRole: `WORKER ${task.type}`,
                 logType: LogType.INFO,
                 content: `Starting execution of task.`,
             },
@@ -102,7 +102,7 @@ const tryTasks = async () => {
 
             await db.agentLog.create({
                 data: {
-                    taskid: task.id,
+                    taskId: task.id,
                     agentRole: `WORKER [${task.type}]`,
                     logType: LogType.CONTEXT,
                     content: `Context from tasks ${task.dependencies.length} has been added.`,
@@ -121,7 +121,7 @@ const tryTasks = async () => {
 
             await db.agentLog.create({
                 data: {
-                    taskid: task.id,
+                    taskId: task.id,
                     agentRole: `WORKER [${task.type}]`,
                     logType: LogType.AGENT_RESPONSE,
                     content: agentResponse,
@@ -162,7 +162,7 @@ const tryTasks = async () => {
                 });
                 await db.agentLog.create({
                     data: {
-                        taskid: task.id,
+                        taskId: task.id,
                         agentRole: "[WORKER]",
                         logType: LogType.ERROR,
                         content:
@@ -192,6 +192,14 @@ const tryTasks = async () => {
             data: { status: MissionStatus.COMPLETED },
         });
         logger.success(`Mission ${missionId} completed successfully.`);
+        await db.agentLog.create({
+            data: {
+                missionId: missionId,
+                agentRole: "ORCHESTRATOR",
+                logType: LogType.INFO,
+                content: "Mission completed successfully.",
+            },
+        });
     }
 
     return true;
@@ -213,6 +221,14 @@ const tryMission = async () => {
         await db.mission.update({
             where: { id: currentMission.id },
             data: { status: MissionStatus.RUNNING },
+        });
+        await db.agentLog.create({
+            data: {
+                missionId: currentMission.id,
+                agentRole: "ORCHESTRATOR",
+                logType: LogType.INFO,
+                content: `Mission found successfully with goal :  ${currentMission.goal}`,
+            },
         });
 
         const agentResponse = await agent.execMission(currentMission.goal);
@@ -242,6 +258,14 @@ const tryMission = async () => {
             });
 
             await db.task.createMany({ data: newTasks });
+            await db.agentLog.create({
+                data: {
+                    missionId: currentMission.id,
+                    agentRole: "ORCHESTRATOR",
+                    logType: LogType.INFO,
+                    content: `Number of tasks created:  ${parsedAgentResponse.length.toString()}`,
+                },
+            });
 
             logger.success(
                 `${parsedAgentResponse.length.toString()} tasks were created.`
@@ -284,6 +308,14 @@ const tryMission = async () => {
             await db.mission.update({
                 where: { id: currentMission.id },
                 data: { status: MissionStatus.FAILED },
+            });
+            await db.agentLog.create({
+                data: {
+                    missionId: currentMission.id,
+                    agentRole: "ORCHESTRATOR",
+                    logType: LogType.ERROR,
+                    content: `Mission failed:  ${e}`,
+                },
             });
             if (e instanceof ZodError) throw e;
             throw new Error(`Unknown Error occured :  ${e}`);
