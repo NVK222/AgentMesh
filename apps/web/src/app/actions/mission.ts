@@ -1,5 +1,5 @@
 "use server";
-import { db } from "@agentmesh/shared";
+import { db, missionQueue } from "@agentmesh/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -14,6 +14,8 @@ export async function createMission(formData: FormData) {
             goal: goal.trim(),
         },
     });
+
+    await missionQueue.add("execute-mission", { missionId: newMission.id });
 
     revalidatePath("/");
     redirect(`/?missionId=${newMission.id}`);
