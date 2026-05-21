@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CreateMissionModal } from "./CreateMissionModal";
 
 interface MissionSummary {
     id: string;
@@ -45,6 +46,9 @@ export function Sidebar({ initialMissions, activeMissionId }: SidebarProps) {
                         AgentMesh Control Center
                     </h1>
                 </div>
+            </div>
+            <div className="pb-2 border-b border-zinc-800/60">
+                <CreateMissionModal />
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
