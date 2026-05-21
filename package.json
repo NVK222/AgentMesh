@@ -4,7 +4,9 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "db:up": "sudo docker compose up -d",
+        "dev": "turbo dev"
     },
     "keywords": [],
     "author": "",
@@ -15,6 +17,7 @@
         "dotenv": "^17.3.1",
         "prettier": "^3.8.1",
         "prisma": "^7.4.0",
+        "turbo": "^2.9.14",
         "typescript": "^5.9.3"
     },
     "type": "module"

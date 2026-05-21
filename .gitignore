@@ -1,4 +1,5 @@
 .env*
+.turbo
 node_modules/
 .prettierrc
 .editorconfig

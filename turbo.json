@@ -1,0 +1,15 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "tasks": {
+        "db:up": {
+            "cache": false
+        },
+        "dev": {
+            "dependsOn": [
+                "^db:up"
+            ],
+            "persistent": true,
+            "cache": false
+        }
+    }
+}
