@@ -82,17 +82,6 @@ export function MissionGraph({
                 maxZoom={1.5}
             >
                 <Background color="#27272a" gap={20} size={1} />
-                <Controls className="!bg-zinc-900 !border-zinc-700 !text-zinc-100 fill-zinc-100" />
-                <MiniMap
-                    className="!bg-zinc-900 !border-zinc-800"
-                    nodeColor={(node) => {
-                        if (node.data?.status === "COMPLETED") return "#22c55e";
-                        if (node.data?.status === "ACTIVE") return "#a855f7";
-                        if (node.data?.status === "FAILED") return "#ef4444";
-                        return "#27272a";
-                    }}
-                    maskColor="rgba(9, 9, 11, 0.7)"
-                />
             </ReactFlow>
         </div>
     );
