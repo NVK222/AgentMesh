@@ -32,3 +32,11 @@ export async function createMission(formData: FormData) {
     revalidatePath("/");
     redirect(`/?missionId=${newMission.id}`);
 }
+
+export async function deleteMission(missionId: string) {
+    if (!missionId) throw new Error("Invalid Mission ID");
+
+    await db.mission.delete({ where: { id: missionId } });
+    revalidatePath("/");
+    redirect("/");
+}

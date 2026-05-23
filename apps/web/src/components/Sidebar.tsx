@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { CreateMissionModal } from "./CreateMissionModal";
+import { deleteMission } from "@/app/actions/mission";
 
 interface MissionSummary {
     id: string;
@@ -37,6 +38,25 @@ export function Sidebar({ initialMissions, activeMissionId }: SidebarProps) {
         return () => eventSource.close();
     }, []);
 
+    const handleDelete = (e: React.MouseEvent, missionId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const confirmed = window.confirm(
+            "Are you sure you want to permanently delete this mission? This will clear all cascaded tasks and log records."
+        );
+
+        if (confirmed) {
+            startTransition(async () => {
+                try {
+                    await deleteMission(missionId);
+                } catch (err) {
+                    console.error("Failed to execute mission deletion:", err);
+                }
+            });
+        }
+    };
+
     return (
         <aside className="w-80 border-r border-zinc-800 bg-zinc-900/40 flex flex-col h-full flex-shrink-0">
             <div className="p-5 border-b border-zinc-800">
@@ -63,13 +83,20 @@ export function Sidebar({ initialMissions, activeMissionId }: SidebarProps) {
                             onClick={() =>
                                 router.push(`?missionId=${mission.id}`)
                             }
-                            className={`w-full block p-3.5 rounded-xl border transition-all duration-200 text-left ${
+                            className={`w-full block p-3.5 rounded-xl border transition-all duration-200 text-left relative group ${
                                 isActive
                                     ? "bg-purple-950/20 border-purple-500/50 text-purple-200 shadow-sm"
                                     : "bg-zinc-900/30 border-zinc-800/60 hover:bg-zinc-900/80 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"
                             }`}
                         >
-                            <div className="font-medium text-xs truncate mb-1">
+                            <span
+                                onClick={(e) => handleDelete(e, mission.id)}
+                                className="absolute top-3.5 right-3.5 opacity-0 group-hover:opacity-100 p-1 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 text-[10px] leading-none z-1- font-bold cursor-pointer"
+                                title="Delete Mission"
+                            >
+                                X
+                            </span>
+                            <div className="font-medium text-xs truncate mb-1 pr-6">
                                 {mission.goal}
                             </div>
                             <div className="flex items-center gap-1.5 font-mono text-[9px] opacity-75">
