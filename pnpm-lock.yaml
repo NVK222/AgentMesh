@@ -115,9 +115,15 @@ importers:
       '@google/genai':
         specifier: ^1.46.0
         version: 1.46.0
+      bullmq:
+        specifier: ^5.76.10
+        version: 5.76.10
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
+      ioredis:
+        specifier: ^5.10.1
+        version: 5.10.1
       zod:
         specifier: ^4.3.6
         version: 4.3.6

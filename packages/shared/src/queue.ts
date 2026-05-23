@@ -1,6 +1,12 @@
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 
-export const redis = new Redis();
+const globalRedis = global as unknown as {
+    redis: Redis;
+};
 
-export const missionQueue = new Queue("mission-queue");
+export const redis =
+    globalRedis.redis || new Redis({ maxRetriesPerRequest: null });
+if (process.env.NODE_ENV !== "production") globalRedis.redis = redis;
+
+export const missionQueue = new Queue("mission-queue", { connection: redis });
