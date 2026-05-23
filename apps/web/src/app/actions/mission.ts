@@ -21,8 +21,11 @@ export async function createMission(formData: FormData) {
         {
             attempts: 3,
             backoff: 5000,
-            removeOnComplete: true,
-            removeOnFail: false,
+            removeOnComplete: {
+                age: 3600,
+                count: 50,
+            },
+            removeOnFail: { age: 86400 },
         }
     );
 
