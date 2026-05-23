@@ -14,6 +14,7 @@ const worker = new Worker(
         lockDuration: 3000,
         lockRenewTime: 15000,
         maxStalledCount: 2,
+        concurrency: 2,
     }
 );
 
