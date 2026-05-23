@@ -15,7 +15,16 @@ export async function createMission(formData: FormData) {
         },
     });
 
-    await missionQueue.add("execute-mission", { missionId: newMission.id });
+    await missionQueue.add(
+        "execute-mission",
+        { missionId: newMission.id },
+        {
+            attempts: 3,
+            backoff: 5000,
+            removeOnComplete: true,
+            removeOnFail: false,
+        }
+    );
 
     revalidatePath("/");
     redirect(`/?missionId=${newMission.id}`);

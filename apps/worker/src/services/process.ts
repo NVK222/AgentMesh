@@ -157,6 +157,8 @@ const tryTasks = async (missionId: string) => {
             }
 
             if (e instanceof Error) logger.error(e.message);
+
+            throw e;
         }
     });
 
@@ -191,8 +193,40 @@ const tryTasks = async (missionId: string) => {
 export const tryMission = async (missionId: string) => {
     const currentMission = await db.mission.findUnique({
         where: { id: missionId },
+        include: { tasks: true },
     });
-    if (currentMission && currentMission.status == MissionStatus.PENDING) {
+
+    if (!currentMission) return;
+
+    if (currentMission.status === MissionStatus.RUNNING) {
+        if (currentMission.tasks.length === 0) {
+            logger.orchestrator(
+                `Mission ${currentMission.id} crashed. Restarting`
+            );
+            await db.agentLog.create({
+                data: {
+                    missionId: missionId,
+                    agentRole: "ORCHESTRATOR",
+                    logType: LogType.INFO,
+                    content: "Mission crashed. Restarting",
+                },
+            });
+            await db.mission.update({
+                where: { id: missionId },
+                data: { status: MissionStatus.PENDING },
+            });
+        } else {
+            await db.task.updateMany({
+                where: { missionId: missionId, status: TaskStatus.ACTIVE },
+                data: { status: TaskStatus.WAITING },
+            });
+
+            await tryTasks(missionId);
+            return;
+        }
+    }
+
+    if (currentMission.status == MissionStatus.PENDING) {
         logger.orchestrator(
             `Found mission: [${currentMission.id}] - Goal : ${currentMission.goal} - Starting execution ...`
         );
@@ -304,6 +338,8 @@ export const tryMission = async (missionId: string) => {
                 flattenError(e).fieldErrors;
             }
             console.error(`Unknown Error occured :  ${e}`);
+
+            throw e;
         }
     }
 };

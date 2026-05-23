@@ -9,7 +9,12 @@ const worker = new Worker(
         const { missionId } = job.data;
         await tryMission(missionId);
     },
-    { connection: redis }
+    {
+        connection: redis,
+        lockDuration: 3000,
+        lockRenewTime: 15000,
+        maxStalledCount: 2,
+    }
 );
 
 worker.on("error", (err) => {
