@@ -19,6 +19,13 @@ This project is built explicitly as a self-hosted monorepo using manual infrastr
 
 ---
 
+## Preview
+<img width="1798" height="1012" alt="image" src="https://github.com/user-attachments/assets/53487433-7e49-450c-b264-9b7841fcad23" />
+<img width="1815" height="1023" alt="image" src="https://github.com/user-attachments/assets/4ddf6c20-db9b-41f7-a29e-1c8ad11fd870" />
+<img width="1813" height="1022" alt="image" src="https://github.com/user-attachments/assets/6c6fe94d-af7b-4071-af4a-56be9117584b" />
+
+---
+
 ## Getting Started
 
 ### Prerequisites
